@@ -75,8 +75,16 @@ def load_prices():
 
 def calc_risk_metrics(returns):
     """Calculate all risk metrics from a return series."""
+    returns = returns.dropna()
+    if len(returns) < 2:
+        return {
+            "Annualized Volatility": 0.0,
+            "VaR (95%, 1-day)": 0.0,
+            "Sharpe Ratio": 0.0,
+            "Sortino Ratio": 0.0,
+        }
     vol = returns.std() * np.sqrt(252)
-    var_95 = np.percentile(returns, 5)
+    var_95 = float(np.percentile(returns.values, 5))
     sharpe = (returns.mean() * 252 - 0.04) / vol if vol > 0 else 0
     downside = returns[returns < 0]
     sortino = (returns.mean() * 252 - 0.04) / (downside.std() * np.sqrt(252)) if len(downside) > 0 else 0
@@ -98,8 +106,9 @@ prices = load_prices()
 portfolio_value = pd.Series(0.0, index=prices.index)
 for ticker, shares, _, _ in HOLDINGS:
     if ticker in prices.columns:
-        portfolio_value += prices[ticker] * shares
+        portfolio_value += prices[ticker].fillna(0) * shares
 
+portfolio_value = portfolio_value[portfolio_value > 0]
 portfolio_returns = portfolio_value.pct_change().dropna()
 
 # Current prices and weights
