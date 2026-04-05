@@ -8,6 +8,7 @@ Deploy to web: Push to GitHub, then connect to Streamlit Cloud (free)
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
 # --- Page Config ---
@@ -171,11 +172,56 @@ chart_col1, chart_col2 = st.columns(2)
 
 with chart_col1:
     st.subheader("Portfolio Value")
-    st.line_chart(portfolio_value)
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(
+        x=portfolio_value.index, y=portfolio_value.values,
+        mode="lines", line=dict(color="#2B5797", width=2),
+        hovertemplate="Date: %{x|%Y-%m-%d}<br>Value: $%{y:,.0f}<extra></extra>",
+    ))
+    fig1.update_layout(
+        height=320, margin=dict(l=0, r=0, t=10, b=0),
+        yaxis=dict(tickprefix="$", tickformat=","),
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=[
+                    dict(count=1, label="1M", step="month", stepmode="backward"),
+                    dict(count=3, label="3M", step="month", stepmode="backward"),
+                    dict(label="All", step="all"),
+                ],
+                font=dict(size=11),
+            ),
+            rangeslider=dict(visible=True, thickness=0.08),
+        ),
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig1, use_container_width=True)
 
 with chart_col2:
-    st.subheader("Daily Returns (last 30 days)")
-    st.bar_chart(portfolio_returns.tail(30))
+    st.subheader("Daily Returns")
+    colors = ["#2E7D32" if r >= 0 else "#C62828" for r in portfolio_returns.values]
+    fig2 = go.Figure()
+    fig2.add_trace(go.Bar(
+        x=portfolio_returns.index, y=portfolio_returns.values,
+        marker_color=colors,
+        hovertemplate="Date: %{x|%Y-%m-%d}<br>Return: %{y:.2%}<extra></extra>",
+    ))
+    fig2.update_layout(
+        height=320, margin=dict(l=0, r=0, t=10, b=0),
+        yaxis=dict(tickformat=".1%"),
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=[
+                    dict(count=1, label="1M", step="month", stepmode="backward"),
+                    dict(count=3, label="3M", step="month", stepmode="backward"),
+                    dict(label="All", step="all"),
+                ],
+                font=dict(size=11),
+            ),
+            rangeslider=dict(visible=True, thickness=0.08),
+        ),
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig2, use_container_width=True)
 
 
 # --- Row 3: Risk Metrics ---
