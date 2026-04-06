@@ -1,5 +1,8 @@
 """
-app.py — Web Dashboard for Risk Control (Streamlit)
+app.py — Portfolio Risk Control Dashboard (Open Source Template)
+
+Anyone can use this! Just deploy to Streamlit Cloud and configure
+your portfolio through the sidebar — no code changes needed.
 
 Run locally:   streamlit run app.py
 Deploy to web: Push to GitHub, then connect to Streamlit Cloud (free)
@@ -9,6 +12,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import json
 from datetime import datetime, timedelta
 
 # --- Page Config ---
@@ -18,29 +22,117 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("📊 Portfolio Risk Control Dashboard")
-st.caption(f"Last updated: {datetime.today().strftime('%Y-%m-%d %H:%M')}")
-
 # =============================================================
-# DATA — Edit these to match your portfolio
+# SIDEBAR — Portfolio Configuration (no code editing needed!)
 # =============================================================
 
-HOLDINGS = [
-    ("AAPL",      50,  178.00, "Technology"),
-    ("MSFT",      30,  380.00, "Technology"),
-    ("NVDA",      20,  720.00, "Technology"),
-    ("0700.HK",  100,  320.00, "Technology"),
-    ("9988.HK",  200,   80.00, "E-Commerce"),
-    ("600519.SS",  5, 1680.00, "Consumer"),
+SECTOR_OPTIONS = [
+    "Technology", "Healthcare", "Finance", "Consumer",
+    "Energy", "Industrial", "Materials", "E-Commerce",
+    "Real Estate", "Telecom", "Utilities", "Other",
 ]
 
-RISK_LIMITS = {
-    "max_single_stock_weight": 0.20,
-    "max_sector_weight":       0.40,
-    "stop_loss_pct":           -0.10,
-    "max_portfolio_drawdown":  -0.15,
-    "max_volatility":          0.30,
+# Default portfolio (used on first load)
+DEFAULT_HOLDINGS = [
+    {"ticker": "AAPL",      "shares": 50,  "cost": 178.00, "sector": "Technology"},
+    {"ticker": "MSFT",      "shares": 30,  "cost": 380.00, "sector": "Technology"},
+    {"ticker": "NVDA",      "shares": 20,  "cost": 720.00, "sector": "Technology"},
+    {"ticker": "0700.HK",   "shares": 100, "cost": 320.00, "sector": "Technology"},
+    {"ticker": "9988.HK",   "shares": 200, "cost": 80.00,  "sector": "E-Commerce"},
+    {"ticker": "600519.SS", "shares": 5,   "cost": 1680.00,"sector": "Consumer"},
+]
+
+DEFAULT_LIMITS = {
+    "max_single_stock_weight": 20,
+    "max_sector_weight": 40,
+    "stop_loss_pct": 10,
+    "max_portfolio_drawdown": 15,
+    "max_volatility": 30,
 }
+
+# Initialize session state
+if "holdings" not in st.session_state:
+    st.session_state.holdings = DEFAULT_HOLDINGS.copy()
+if "limits" not in st.session_state:
+    st.session_state.limits = DEFAULT_LIMITS.copy()
+
+with st.sidebar:
+    st.header("Portfolio Settings")
+
+    # --- Holdings Editor ---
+    st.subheader("Holdings")
+    st.caption("Ticker format: US=AAPL, HK=0700.HK, A-share=600519.SS")
+
+    edited_holdings = []
+    for i, h in enumerate(st.session_state.holdings):
+        cols = st.columns([3, 2, 2, 3, 1])
+        ticker = cols[0].text_input("Ticker", value=h["ticker"], key=f"t_{i}", label_visibility="collapsed")
+        shares = cols[1].number_input("Shares", value=h["shares"], min_value=0, step=1, key=f"s_{i}", label_visibility="collapsed")
+        cost = cols[2].number_input("Cost", value=h["cost"], min_value=0.0, step=0.01, key=f"c_{i}", label_visibility="collapsed")
+        sector = cols[3].selectbox("Sector", SECTOR_OPTIONS, index=SECTOR_OPTIONS.index(h["sector"]) if h["sector"] in SECTOR_OPTIONS else 0, key=f"sec_{i}", label_visibility="collapsed")
+        if cols[4].button("X", key=f"del_{i}"):
+            st.session_state.holdings.pop(i)
+            st.rerun()
+        if ticker.strip():
+            edited_holdings.append({"ticker": ticker.strip().upper(), "shares": int(shares), "cost": float(cost), "sector": sector})
+
+    st.session_state.holdings = edited_holdings
+
+    if st.button("+ Add stock"):
+        st.session_state.holdings.append({"ticker": "", "shares": 0, "cost": 0.0, "sector": "Technology"})
+        st.rerun()
+
+    # --- Risk Limits ---
+    st.divider()
+    st.subheader("Risk limits")
+    lim = st.session_state.limits
+    lim["max_single_stock_weight"] = st.slider("Max single stock weight %", 5, 50, lim["max_single_stock_weight"])
+    lim["max_sector_weight"] = st.slider("Max sector weight %", 10, 80, lim["max_sector_weight"])
+    lim["stop_loss_pct"] = st.slider("Stop-loss trigger %", 5, 30, lim["stop_loss_pct"])
+    lim["max_portfolio_drawdown"] = st.slider("Max drawdown %", 5, 40, lim["max_portfolio_drawdown"])
+    lim["max_volatility"] = st.slider("Max volatility %", 10, 60, lim["max_volatility"])
+    st.session_state.limits = lim
+
+    # --- Import / Export ---
+    st.divider()
+    with st.expander("Import / Export portfolio"):
+        export_data = json.dumps({"holdings": st.session_state.holdings, "limits": st.session_state.limits}, indent=2)
+        st.download_button("Export as JSON", export_data, "portfolio.json", "application/json")
+
+        uploaded = st.file_uploader("Import JSON", type=["json"])
+        if uploaded:
+            try:
+                data = json.loads(uploaded.read())
+                st.session_state.holdings = data["holdings"]
+                st.session_state.limits = data["limits"]
+                st.success("Portfolio imported!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Invalid file: {e}")
+
+    st.divider()
+    st.caption("Built with [Streamlit](https://streamlit.io) • [Source Code](https://github.com/sykvan/Risk-Control)")
+
+
+# =============================================================
+# Convert sidebar config to internal format
+# =============================================================
+
+HOLDINGS = [(h["ticker"], h["shares"], h["cost"], h["sector"]) for h in st.session_state.holdings if h["ticker"]]
+RISK_LIMITS = {
+    "max_single_stock_weight": st.session_state.limits["max_single_stock_weight"] / 100,
+    "max_sector_weight":       st.session_state.limits["max_sector_weight"] / 100,
+    "stop_loss_pct":           -st.session_state.limits["stop_loss_pct"] / 100,
+    "max_portfolio_drawdown":  -st.session_state.limits["max_portfolio_drawdown"] / 100,
+    "max_volatility":          st.session_state.limits["max_volatility"] / 100,
+}
+
+if not HOLDINGS:
+    st.warning("Please add at least one stock in the sidebar to get started.")
+    st.stop()
+
+st.title("📊 Portfolio Risk Control Dashboard")
+st.caption(f"Last updated: {datetime.today().strftime('%Y-%m-%d %H:%M')} • {len(HOLDINGS)} positions")
 
 
 # =============================================================
@@ -48,14 +140,14 @@ RISK_LIMITS = {
 # =============================================================
 
 @st.cache_data(ttl=300)
-def load_prices():
+def load_prices(tickers_tuple):
     """
     Fetch price data. Different markets have different trading days,
     so we forward-fill each stock and only keep dates where ALL have data.
     """
+    tickers = list(tickers_tuple)
     try:
         import yfinance as yf
-        tickers = [h[0] for h in HOLDINGS]
         end = datetime.today()
         start = end - timedelta(days=250)
         data = yf.download(
@@ -81,10 +173,11 @@ def load_prices():
         dates = pd.date_range(end=datetime.today(), periods=120, freq="B")
         np.random.seed(42)
         demo = {}
-        for ticker, _, cost, _ in HOLDINGS:
+        for ticker in tickers:
+            cost = next((h[2] for h in HOLDINGS if h[0] == ticker), 100)
             returns = np.random.normal(0.0005, 0.02, len(dates))
-            prices = cost * np.cumprod(1 + returns)
-            demo[ticker] = prices
+            p = cost * np.cumprod(1 + returns)
+            demo[ticker] = p
         return pd.DataFrame(demo, index=dates)
 
 
@@ -171,7 +264,7 @@ def load_fx_rates():
 # LOAD DATA
 # =============================================================
 
-prices = load_prices()
+prices = load_prices(tuple(h[0] for h in HOLDINGS))
 fx_data = load_fx_rates()
 fx_rates = fx_data["rates"]
 
@@ -596,4 +689,4 @@ with st.expander("Data Info"):
     if missing:
         st.warning(f"**Missing tickers** (using cost as price): {', '.join(missing)}")
 
-st.caption("Built with Streamlit • Risk Control Toolkit for Student Investment Club")
+st.caption("Built with Streamlit • [Fork this project on GitHub](https://github.com/sykvan/Risk-Control) • Risk Control Toolkit")

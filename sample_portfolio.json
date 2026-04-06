@@ -1,0 +1,17 @@
+{
+  "holdings": [
+    {"ticker": "AAPL", "shares": 50, "cost": 178.00, "sector": "Technology"},
+    {"ticker": "MSFT", "shares": 30, "cost": 380.00, "sector": "Technology"},
+    {"ticker": "NVDA", "shares": 20, "cost": 720.00, "sector": "Technology"},
+    {"ticker": "0700.HK", "shares": 100, "cost": 320.00, "sector": "Technology"},
+    {"ticker": "9988.HK", "shares": 200, "cost": 80.00, "sector": "E-Commerce"},
+    {"ticker": "600519.SS", "shares": 5, "cost": 1680.00, "sector": "Consumer"}
+  ],
+  "limits": {
+    "max_single_stock_weight": 20,
+    "max_sector_weight": 40,
+    "stop_loss_pct": 10,
+    "max_portfolio_drawdown": 15,
+    "max_volatility": 30
+  }
+}
